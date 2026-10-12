@@ -7,9 +7,9 @@ là chạy, không cần nhớ Serial nào cho từng board. Muốn tự chọn 
 
 | Chân module | Nối tới | Ghi chú |
 |---|---|---|
-| 1 `V_TOUCH` | 3.3V | **Luôn cấp nguồn**, không được cắt |
-| 2 `TOUCH_OUT` | GPIO input (VD: D4) | HIGH = có ngón tay (dùng `fingerTouched()` / ngắt wake-up) |
-| 3 `VCC` | 3.3V qua MOSFET | Điều khiển bằng `setPowerPin()`; nên dùng **LDO riêng**, không chung với MCU |
+| 1 `V_TOUCH` | 3.3V | **Luôn cấp nguồn**, không được cắt, cấp 5V để mua cái mới |
+| 2 `TOUCH_OUT` | GPIO input (VD: D4) | HIGH = có ngón tay (dùng `fingerTouched()` / ngắt wake-up), chủ yếu dùng với màn hình TFT khi chạm cảm biến thì sáng LCD để thao tác |
+| 3 `VCC` | 3.3V | Điều khiển bằng `setPowerPin()`; nên dùng **LDO riêng**, không chung với MCU (khuyến nghị của datasheet nếu thiết kế PCB), nếu muốn mua cái mới thì cấp thẳng 5V vào nhé!|
 | 4 `TX` | **RX** của UART đã chọn | Module → MCU |
 | 5 `RX` | **TX** của UART đã chọn | MCU → Module |
 | 6 `GND` | GND | Chung mass |
