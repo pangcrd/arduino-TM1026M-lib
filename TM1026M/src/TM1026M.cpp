@@ -392,16 +392,19 @@ int16_t TM1026M::listUsers(TM1026M_User *users, uint16_t maxUsers) {
   if (h.q3 == TM_ACK_FAIL) return 0;  // empty database
   if (h.q3 != TM_ACK_SUCCESS) return -1;
 
+  /* SFM-V1.7 §3.14: data package bytes 2-3 are the payload size = 3 * userCount
+   * (per the doc example: 1 user -> 0x0003), NOT the user count. */
   uint8_t head;
   if (!readBytes(&head, 1, 2000) || head != TM1026M_FRAME_HEAD) return -1;
   uint8_t cnt[2];
   if (!readBytes(cnt, 2, 3000)) return -1;
   uint16_t total = ((uint16_t)cnt[0] << 8) | cnt[1];
+  uint16_t userCount = total / 3;
   uint8_t chk = (uint8_t)(cnt[0] ^ cnt[1]);
 
   uint16_t stored = 0;
   uint8_t u[3];
-  for (uint16_t i = 0; i < total; i++) {
+  for (uint16_t i = 0; i < userCount; i++) {
     if (!readBytes(u, 3, 3000)) return -1;
     chk ^= (uint8_t)(u[0] ^ u[1] ^ u[2]);
     if (stored < maxUsers) {

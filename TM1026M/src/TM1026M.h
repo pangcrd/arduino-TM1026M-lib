@@ -16,7 +16,7 @@
 
 /* ---------------- protocol constants ---------------- */
 #define TM1026M_BAUD          115200UL
-#define TM1026M_LIB_VERSION   "1.1.2"
+#define TM1026M_LIB_VERSION   "1.1.5"
 
 #define TM1026M_FRAME_HEAD    0xF5
 #define TM1026M_FRAME_TAIL    0xF5
