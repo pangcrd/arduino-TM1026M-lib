@@ -1,4 +1,14 @@
-# TM1026M — Arduino driver cho module vân tay BIOSEC TM1026M
+# Thư viện Arduino cho module vân tay BIOSEC TM1026M
+
+[![ESP32](https://img.shields.io/badge/ESP32-E7352C?logo=espressif&logoColor=white)](https://www.espressif.com/en/products/socs/esp32)
+[![PlatformIO](https://img.shields.io/badge/PlatformIO-FF6C37?logo=platformio&logoColor=white)](https://platformio.org/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-007ACC?logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
+[![Arduino Framework](https://img.shields.io/badge/Framework-Arduino-00979D?logo=arduino&logoColor=white)](https://www.arduino.cc/)
+[![Open Source](https://img.shields.io/badge/Open--Source-333333?logo=github&logoColor=white)](https://github.com/pangcrd)
+[![YouTube](https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/@pangcrd)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/pangcrd)
+[![Donate via PayPal](https://img.shields.io/badge/Donate-PayPal-00457C?logo=paypal&logoColor=white)](https://www.paypal.me/vnbg)
+[![Donate via MoMo](https://img.shields.io/badge/Donate-MoMo-A50064?style=flat&logoColor=white)](https://me.momo.vn/xmsli3iKtAsdfviV)
 
 Điểm chính: **tự chọn UART theo MCU** — khai báo `TM1026M fp;` rồi `fp.begin();`
 là chạy, không cần nhớ Serial nào cho từng board. Muốn tự chọn thì vẫn được.
@@ -26,7 +36,7 @@ là chạy, không cần nhớ Serial nào cho từng board. Muốn tự chọn 
 
 Copy thư mục `TM1026M/` vào `Arduino/libraries/`
 
-## Chọn UART theo MCU
+## Chọn UART theo MCU / Select UART based on the MCU.
 
 | MCU | Cổng mặc định | Pins mặc định |
 |---|---|---|
@@ -109,17 +119,16 @@ TM1026M::statusName(fp.lastStatus())
 ```
 
 Frame protocol: `F5 TYPE P1 P2 P3 00 CHK F5`, `CHK = XOR các byte 2..6`.
-Mã ACK mở rộng: `0x0A` lỗi phần cứng, `0x10` lỗi ảnh, `0x11` phát hiện贴膜攻击,
-`0x12` lỗi同源性, `0x18` lệnh bị打断.
+Mã ACK mở rộng: `0x0A` lỗi phần cứng, `0x10` lỗi ảnh, `0x11` phát hiện Film-based attack,
+`0x12` lỗi Homology, `0x18` lệnh bị interrupt.
 
-## Ví dụ
+## Ví dụ / Example
 
 - `examples/AutoSelect` — chọn cổng tự động + match 1:N khi chạm.
-- `examples/EnrollMatch` — menu qua Serial Monitor: `e <id>` đăng ký
-  (`e 0` = tự cấp id), `m [role]`比对, `c` đếm, `d <id>` xóa,
-  `f` id trống, `v` version, `l` liệt kê users.
+- `examples/EnrollMatch` — menu qua Serial Monitor: `e <id>` đăng ký - Nên dùng ESP32
+- `examples/CaptureImage` — Để chụp vân tay hiển thị lên LCD, cập nhập sau  
 
-## Xử lý sự cố
+## Xử lý sự cố / Troubleshooting
 
 - `begin()` trả về false → kiểm tra: V_TOUCH có 3.3V chưa, VCC đã bật chưa,
   TX/RX có đấu chéo chưa, baud 115200.
