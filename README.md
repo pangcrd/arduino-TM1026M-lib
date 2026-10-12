@@ -3,7 +3,7 @@
 Điểm chính: **tự chọn UART theo MCU** — khai báo `TM1026M fp;` rồi `fp.begin();`
 là chạy, không cần nhớ Serial nào cho từng board. Muốn tự chọn thì vẫn được.
 
-## Đấu dây
+## Đấu nối/ Wiring
 
 | Chân module | Nối tới | Ghi chú |
 |---|---|---|
@@ -19,13 +19,12 @@ là chạy, không cần nhớ Serial nào cho từng board. Muốn tự chọn 
 - Trước khi cắt VCC phải đưa chân UART của MCU về **input high-Z**
   (driver tự làm trong `powerOff()`), và **không cắt nguồn khi module đang chụp** —
   gọi `abortCapture()` trước.
-- Nếu bật self-learning (`configEnroll(TM_PID_SELF_LEARN, ...)`), sau khi比对
+- Nếu bật self-learning (`configEnroll(TM_PID_SELF_LEARN, ...)`), sau khi so sánh
   phải **đợi 300ms mới được cắt nguồn**, không sẽ hỏng dữ liệu tự học.
 
-## Cài đặt
+## Cài đặt / Setting
 
-Copy thư mục `TM1026M/` vào `Arduino/libraries/`, hoặc dùng file zip:
-*Sketch → Include Library → Add .ZIP Library*.
+Copy thư mục `TM1026M/` vào `Arduino/libraries/`
 
 ## Chọn UART theo MCU
 
@@ -125,7 +124,7 @@ Mã ACK mở rộng: `0x0A` lỗi phần cứng, `0x10` lỗi ảnh, `0x11` phá
 - `begin()` trả về false → kiểm tra: V_TOUCH có 3.3V chưa, VCC đã bật chưa,
   TX/RX có đấu chéo chưa, baud 115200.
 - Enroll fail với `USER_EXIST` → đang ở chế độ cấm trùng, hoặc ngón tay đã đăng ký.
-- Enroll fail với `SPOOF_DETECTED` → module phát hiện贴膜攻击 (dán film).
+- Enroll fail với `SPOOF_DETECTED` → module phát hiện  (dán film).
 - Match 1:N treo lâu → module mặc định đợi ngón tay (timeout 8s); gửi bất kỳ
   lệnh nào để ngắt (VD `fp.abortCapture()`).
 - `captureFeature` cần **8KB RAM trống** — không dùng trên Uno/Nano.
