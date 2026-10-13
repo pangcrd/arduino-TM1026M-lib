@@ -72,11 +72,11 @@ void setup() {
 // Nguồn & handshake
 fp.powerOn() / fp.powerOff()      // đúng flow datasheet (handshake / high-Z)
 fp.handshake()                    // fast-init phụ lục 1 (thay cho delay 150ms)
-fp.abortCapture()                 // §3.20: thoát trạng thái chụp ngay lập tức
+fp.abortCapture()                 // thoát trạng thái chụp ngay lập tức
 fp.fingerTouched()                // đọc TOUCH_OUT
-fp.detectFinger()                 // §3.16: hỏi module "có ngón tay không?"
+fp.detectFinger()                 // hỏi module "có ngón tay chạm không?"
 
-// Đăng ký (SFM-V1.7 §3.1) — 3C3R mặc định, 3 lần nhấn, NHẤC TAY giữa các lần
+// Đăng ký — 3C3R mặc định, 3 lần nhấn, NHẤC TAY giữa các lần
 uint16_t uid = 0;                 // id 1..10000; id = 0 → module tự cấp, trả về qua uid
 fp.enroll(uid, /*perm=*/1);       // true = xong, uid = id đã đăng ký
 fp.enrollNCNR(uid, 1, presses);   // cần configEnroll(TM_PID_ENROLL_MODE, 6) trước
@@ -97,12 +97,12 @@ fp.firstFreeId();                 // id trống đầu tiên (§3.8)
 fp.listUsers(users, maxUsers);    // liệt kê id + quyền (§3.14)
 
 // Cấu hình module
-fp.setMatchLevel(0..2);           // §3.13: 0..2 (mặc định 2, càng cao càng chặt)
+fp.setMatchLevel(0..2);           //0..2 (mặc định 2, càng cao càng chặt)
 fp.getMatchLevel();
 fp.setDuplicateMode(true/false);  // mặc định sau power-up: cho trùng
-fp.setBaudRate(TM_BAUD_9600);     // §3.9: đổi baud, driver tự mở lại UART đúng baud
-fp.setLed(TM_LED_RED, TM_LED_BLUE, 96);  // §3.19: LED heart beat(period 30..200)
-fp.configEnroll(TM_PID_CAPTURE_COUNT, 5); // §3.18: PID cấu hình enroll
+fp.setBaudRate(TM_BAUD_9600);     // đổi baud, driver tự mở lại UART đúng baud
+fp.setLed(TM_LED_RED, TM_LED_BLUE, 96);  // LED heart beat(period 30..200)
+fp.configEnroll(TM_PID_CAPTURE_COUNT, 5); //PID cấu hình enroll
 fp.getVersion(buf, len);          // chuỗi version
 fp.getUniqueId(uid8);             // 8 byte ID duy nhất của module
 fp.sleep();
@@ -113,7 +113,7 @@ fp.captureFeature(feat);
 uint8_t img[176*176]; uint16_t w, h;
 fp.captureImage(img, sizeof(img), w, h);
 
-// Thô
+// Dữ liệu RAW
 fp.command(cmd, p1, p2, p3, ack); // gửi frame 8-byte, tự check checksum
 TM1026M::statusName(fp.lastStatus())
 ```
@@ -134,6 +134,7 @@ Mã ACK mở rộng: `0x0A` lỗi phần cứng, `0x10` lỗi ảnh, `0x11` phá
   TX/RX có đấu chéo chưa, baud 115200.
 - Enroll fail với `USER_EXIST` → đang ở chế độ cấm trùng, hoặc ngón tay đã đăng ký.
 - Enroll fail với `SPOOF_DETECTED` → module phát hiện  (dán film).
+- lỗi Homology set mức Homology xuống thấp hơn có 5 mức (0-5)
 - Match 1:N treo lâu → module mặc định đợi ngón tay (timeout 8s); gửi bất kỳ
   lệnh nào để ngắt (VD `fp.abortCapture()`).
 - `captureFeature` cần **8KB RAM trống** — không dùng trên Uno/Nano.
