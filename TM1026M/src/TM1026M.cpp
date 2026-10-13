@@ -31,7 +31,10 @@ void TM1026M::setPowerPin(int8_t pin, bool activeHigh) {
   _powerActiveHigh = activeHigh;
 }
 
-void TM1026M::setWakePin(int8_t pin) { _wakePin = pin; }
+void TM1026M::setWakePin(int8_t pin) {
+  _wakePin = pin;
+  if (pin >= 0) pinMode(pin, INPUT);  // TOUCH_OUT is driven by the module
+}
 
 /* ---------------- init ---------------- */
 
@@ -245,10 +248,24 @@ bool TM1026M::command(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3,
 bool TM1026M::enrollSend(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3,
                          TM1026M_Ack &ack, uint32_t timeoutMs) {
   if (!_serial) return false;
+  _lastAck.q3 = 0xFF;  // mark "no response yet" so lastStatus() isn't stale
   flushRx();
   sendFrame(cmd, p1, p2, p3);
   if (!recvFrame(timeoutMs, ack, 0)) return false;  // timeout / bad checksum
   return ack.cmd == cmd || ack.cmd == TM_CMD_ADD_FINAL;
+}
+
+/* Wait for the finger to lift between enroll presses. TOUCH_OUT is
+ * active-HIGH (HIGH = finger present, per BIOSEC-TM1026M datasheet). */
+void TM1026M::waitLift(uint32_t timeoutMs) {
+  if (_wakePin < 0) {
+    delay(1200);  // no wake pin: fixed wait so the user can lift in time
+    return;
+  }
+  uint32_t t = millis();
+  while (digitalRead(_wakePin) == HIGH && (uint32_t)(millis() - t) < timeoutMs)
+    delay(10);
+  delay(300);  // extra settle time after the lift is detected
 }
 
 bool TM1026M::enroll(uint16_t &userId, uint8_t permission,
@@ -258,13 +275,17 @@ bool TM1026M::enroll(uint16_t &userId, uint8_t permission,
   uint8_t p2 = (uint8_t)(userId & 0xFF);
 
   for (uint8_t s = 0; s < 3; s++) {
-    uint8_t tries = 0;
+    uint8_t tries = 0, badTries = 0;
     for (;;) {
       TM1026M_Ack ack;
       bool first = (s == 0);
-      if (!enrollSend(steps[s], first ? p1 : 0, first ? p2 : 0,
-                      first ? permission : 0, ack, stepTimeoutMs))
-        return false;
+      bool ok = enrollSend(steps[s], first ? p1 : 0, first ? p2 : 0,
+                           first ? permission : 0, ack, stepTimeoutMs);
+      if (!ok) return false;
+#ifdef TM_DEBUG
+      Serial.printf("[enroll] step %u ok=%d cmd=%02X q3=%02X (%s)\n",
+                    s, ok, ack.cmd, ack.q3, statusName(ack.q3));
+#endif
       if (ack.cmd == TM_CMD_ADD_FINAL) {  // registration finished
         if (ack.q3 == TM_ACK_SUCCESS) {
           userId = ((uint16_t)ack.q1 << 8) | ack.q2;  // auto-assigned ID, if any
@@ -272,12 +293,18 @@ bool TM1026M::enroll(uint16_t &userId, uint8_t permission,
         }
         return false;  // e.g. USER_EXIST when duplicates are denied
       }
-      if (ack.q3 == TM_ACK_SUCCESS) break;  // next press
+      if (ack.q3 == TM_ACK_SUCCESS) { waitLift(); break; }  // next press
       // 0x08 = 8 s without a finger press: ask the user to press again.
       if ((ack.q3 == TM_ACK_TIMEOUT || ack.q3 == TM_ACK_NO_FINGER) &&
           ++tries <= maxRetries)
         continue;
-      return false;  // FULL / FAIL / IMAGEERROR / ...
+      // Bad capture on this step: let the user press again for the same step.
+      if ((ack.q3 == TM_ACK_HOMOLOGYFAIL || ack.q3 == TM_ACK_IMAGEERROR) &&
+          ++badTries <= 5) {
+        waitLift();
+        continue;
+      }
+      return false;  // FULL / FAIL / ...
     }
   }
   return false;  // unreachable: 0x03 always terminates the flow
@@ -306,7 +333,10 @@ bool TM1026M::enrollNCNR(uint16_t &userId, uint8_t permission, uint8_t presses,
         }
         return false;
       }
-      if (ack.q3 == TM_ACK_SUCCESS) break;
+      if (ack.q3 == TM_ACK_SUCCESS) {
+        if (i + 1 < presses) waitLift();  // let the user lift before next press
+        break;
+      }
       if ((ack.q3 == TM_ACK_TIMEOUT || ack.q3 == TM_ACK_NO_FINGER) &&
           ++tries <= maxRetries)
         continue;

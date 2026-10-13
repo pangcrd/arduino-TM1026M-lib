@@ -16,7 +16,7 @@
 
 /* ---------------- protocol constants ---------------- */
 #define TM1026M_BAUD          115200UL
-#define TM1026M_LIB_VERSION   "1.1.9"
+#define TM1026M_LIB_VERSION   "1.1.10"
 
 #define TM1026M_FRAME_HEAD    0xF5
 #define TM1026M_FRAME_TAIL    0xF5
@@ -66,7 +66,7 @@
 #define TM_CMD_PING           0xFE
 #define TM_CMD_SYNC           0xFD
 
-/* 0x3F enroll-config parameter IDs (SFM-V1.7 §3.18) */
+/* 0x3F enroll-config parameter IDs (SFM-V1.7 ) */
 #define TM_PID_ENROLL_MODE    0x0000  // value: 5 = 1CNR, 6 = NCNR
 #define TM_PID_HOMOLOGY       0x0001  // value: 0..5 (homology check strictness)
 #define TM_PID_LIFT_DETECT    0x0002  // value: 1 = enable lift detection
@@ -74,7 +74,7 @@
 #define TM_PID_FILM_DETECT    0x0004  // value: 1 = enable film-attack detection
 #define TM_PID_SELF_LEARN     0x0040  // send before match to enable self-learning
 
-/* 0xC3 LED colors: low 3 bits = RGB, active low (SFM-V1.7 §3.19) */
+/* 0xC3 LED colors: low 3 bits = RGB, active low (SFM-V1.7 ) */
 #define TM_LED_RED    0x03
 #define TM_LED_GREEN  0x05
 #define TM_LED_BLUE   0x06
@@ -185,6 +185,12 @@ public:
   bool handshake(uint32_t timeoutMs = 3000);  // appendix-1 fast init
   bool fingerTouched();                       // needs setWakePin()
 
+  /* Wait until the finger is lifted (TOUCH_OUT goes LOW), so the module
+   * can't capture the next enroll step from a finger that's still down
+   * (it captures in <150 ms — a slow lift becomes a double capture).
+   * Needs setWakePin(); without a wake pin, waits a fixed 1200 ms. */
+  void waitLift(uint32_t timeoutMs = 3000);
+
   /* Raw 8-byte command. Returns false on timeout / checksum error. */
   bool command(uint8_t cmd, uint8_t p1, uint8_t p2, uint8_t p3,
                TM1026M_Ack &ack, uint32_t timeoutMs = 3000);
@@ -192,7 +198,8 @@ public:
   /* ---- enroll (SFM-V1.7 §3.1) ----
    * 3C3R (default mode): 3 presses. userId 1..10000; userId = 0 lets the
    * module auto-assign an ID (returned through the reference).
-   * Lift the finger between presses (film-attack detection may be on). */
+   * waitLift() runs automatically between presses, so the user gets time
+   * to lift the finger (a slow lift would otherwise be captured twice). */
   bool enroll(uint16_t &userId, uint8_t permission = 1,
               uint32_t stepTimeoutMs = 20000, uint8_t maxRetries = 40);
   /* NCNR: configure via configEnroll(TM_PID_ENROLL_MODE, 6) +

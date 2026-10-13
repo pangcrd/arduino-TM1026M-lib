@@ -120,7 +120,7 @@ void setup() {
   while (!Serial) { delay(10); }
 
   Serial.print("TM1026M driver v");
-  Serial.println(TM1026M_LIB_VERSION);  // must show 1.1.9 — if older, update the library!
+  Serial.println(TM1026M_LIB_VERSION);  // must show 1.1.10 — if older, update the library!
 
   fp.setPowerPin(PIN_FP_POWER);
   fp.setWakePin(PIN_FP_WAKE);
