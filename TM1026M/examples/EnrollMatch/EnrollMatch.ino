@@ -1,21 +1,6 @@
 /*
  * EnrollMatch — enroll a fingerprint and match it, with explicit UART choice.
  *
- * Serial monitor commands (115200). Type '?' to list them at any time:
- *   e <id>   enroll finger as user <id> (e.g. "e 7"; "e 0" = auto-assign ID)
- *   m [role] 1:N match, optional role filter (e.g. "m" or "m 2")
- *   c        show enrolled user count
- *   d <id>   delete user <id>
- *   D        delete ALL users (careful!)
- *   f        first unused user ID
- *   v        module version string
- *   l        list enrolled users
- *   h <0-5>  homology check level (0=off, 5=strictest; default varies)
- *   ?        show this help
- *
- * This example shows the manual port/pin selection:
- *   fp.begin(Serial1, RX_PIN, TX_PIN);
- * On ESP32-S31 pick GPIOs that are NOT strapping pins (avoid 36/37/60/61).
  */
 #include <TM1026M.h>
 
@@ -23,16 +8,21 @@
 #define PIN_FP_WAKE   4
 
 // Pick any free UART pins for your board:
-#define FP_RX_PIN     16
+#define FP_RX_PIN     18
 #define FP_TX_PIN     17
 
 TM1026M fp(Serial1);  // <-- explicit port; pins set in begin() below
 
 void printHelp() {
   Serial.println("Commands (type '?' any time to see this list):");
-  Serial.println("  e <id>   Dang ky van tay cho user <id> (vd \"e 7\"; \"e 0\" = module tu cap ID)");
+  Serial.println("  Go lenh + so tren CUNG 1 dong, cach nhau bang dau cach (vd \"t 1\").");
+  Serial.println("  Neu chi go lenh, may se hoi so o dong tiep theo.");
+  Serial.println("  e <id> [role] Dang ky van tay cho user <id> (role 1/2/3, mac dinh 1;");
+  Serial.println("                     vd \"e 7\", \"e 7 2\" = dang ky voi quyen 2, \"e 0\" = module tu cap ID)");
   Serial.println("           Cham CUNG 1 ngon 3 lan, NHAC HAN ngon ra giua cac lan cham.");
-  Serial.println("  m [role] So khop 1:N (vd \"m\" hoac \"m 2\" de loc theo role)");
+  Serial.println("  m [role] So khop 1:N (\"m\" = so voi tat ca user; \"m 2\" = chi so voi user quyen 2)");
+  Serial.println("  t <id>   So khop 1:1 voi 1 user (de kiem tra template co bi hong khong)");
+  Serial.println("  s <0-2>  Dat do gat khi so khop (0=de nhat, 2=gat nhat; reboot la ve 2)");
   Serial.println("  c        Dem so user da dang ky");
   Serial.println("  d <id>   Xoa user <id>");
   Serial.println("  D        XOA TAT CA users (can than!)");
@@ -43,13 +33,16 @@ void printHelp() {
   Serial.println("  ?        Hien bang lenh nay");
 }
 
-void doEnroll(long arg) {
-  if (arg < 0 || arg > 10000) { Serial.println("id must be 0..10000 (0 = auto)"); return; }
-  uint16_t uid = (uint16_t)arg;
+void doEnroll(long id, long role) {
+  if (id < 0 || id > 10000) { Serial.println("id must be 0..10000 (0 = auto)"); return; }
+  uint8_t r = (role < 1 || role > 3) ? 1 : (uint8_t)role;
+  uint16_t uid = (uint16_t)id;
   Serial.print("Enrolling");
   if (uid == 0) Serial.print(" (auto ID)");
+  Serial.print(" with role ");
+  Serial.print(r);
   Serial.println(" — press the SAME finger 3 times, lifting between presses.");
-  if (fp.enroll(uid, 1)) {
+  if (fp.enroll(uid, r)) {
     Serial.print("Enroll OK, user id = ");
     Serial.println(uid);
   } else {
@@ -73,6 +66,22 @@ void doMatch(long arg) {
     Serial.print(TM1026M::statusName(fp.lastStatus()));
     Serial.println(")");
   }
+}
+
+void doMatch11(long arg) {
+  if (arg < 1 || arg > 10000) { Serial.println("usage: t <id>"); return; }
+  Serial.println("Press the enrolled finger...");
+  Serial.println(fp.match1to1((uint16_t)arg) ? "1:1 MATCH!" : "1:1 no match");
+}
+
+void doMatchLevel(long arg) {
+  if (arg < 0 || arg > 2) {
+    Serial.println("usage: s <0-2>  (0=loosest, 2=strictest; resets to 2 on reboot)");
+    return;
+  }
+  if (!fp.setMatchLevel((uint8_t)arg)) { Serial.println("Set FAILED"); return; }
+  Serial.print("Match level now: ");
+  Serial.println(fp.getMatchLevel());
 }
 
 void doDelete(long arg) {
@@ -111,7 +120,7 @@ void setup() {
   while (!Serial) { delay(10); }
 
   Serial.print("TM1026M driver v");
-  Serial.println(TM1026M_LIB_VERSION);  // must show 1.1.5 — if older, update the library!
+  Serial.println(TM1026M_LIB_VERSION);  // must show 1.1.9 — if older, update the library!
 
   fp.setPowerPin(PIN_FP_POWER);
   fp.setWakePin(PIN_FP_WAKE);
@@ -122,31 +131,42 @@ void setup() {
   }
   Serial.println("TM1026M ready. Type '?' for command help.");
 
+  // Match level resets to 2 on every reboot (SFM-V1.7 §3.13). Level 1 is
+  // the sweet spot for this sensor: sensitive, yet 10x stricter than the
+  // ~1/50k FAR of phone fingerprint sensors.
+  if (fp.setMatchLevel(1)) {
+    Serial.println("Match level auto-set to 1 (s <0-2> to change).");
+  } else {
+    Serial.println("Warning: could not set match level!");
+  }
+
   printHelp();
   doVersion();
 }
 
-void loop() {
-  // Skip blank lines so a stray Enter doesn't print "Unknown command".
-  int c;
-  do {
-    if (!Serial.available()) { delay(20); return; }
-    c = Serial.read();
-  } while (c == '\r' || c == '\n' || c == ' ' || c == '\t');
-  char cmd = (char)c;
+/* Line-based REPL: accumulate a full line, then parse it — no timeouts,
+ * so you can take as long as you want between keystrokes. If a command
+ * needs a number and you typed it bare, you'll be prompted on the next
+ * line (typing a new command letter cancels the prompt). */
+static char pendingCmd = 0;  // command waiting for its argument
 
-  while (Serial.available() && Serial.peek() <= ' ') Serial.read();
-  long arg = Serial.parseInt();
-  while (Serial.available()) Serial.read();  // eat end of line
-
+void runCommand(char cmd, long arg, long arg2, bool hasArg) {
   switch (cmd) {
-    case 'e': doEnroll(arg); break;
+    case 'e': doEnroll(arg, arg2); break;  // no arg = auto-assign ID
     case 'm': doMatch(arg); break;
+    case 't':
+      if (!hasArg) { Serial.print("id: "); pendingCmd = 't'; break; }
+      doMatch11(arg); break;
+    case 's':
+      if (!hasArg) { Serial.print("level (0-2): "); pendingCmd = 's'; break; }
+      doMatchLevel(arg); break;
     case 'c':
       Serial.print("Enrolled users: ");
       Serial.println(fp.userCount());
       break;
-    case 'd': doDelete(arg); break;
+    case 'd':
+      if (!hasArg) { Serial.print("id: "); pendingCmd = 'd'; break; }
+      doDelete(arg); break;
     case 'D':
       Serial.println(fp.deleteAllUsers() ? "All users deleted" : "Delete failed");
       break;
@@ -156,12 +176,59 @@ void loop() {
       break;
     case 'v': doVersion(); break;
     case 'l': doList(); break;
-    case 'h': doHomology(arg); break;
+    case 'h':
+      if (!hasArg) { Serial.print("level (0-5): "); pendingCmd = 'h'; break; }
+      doHomology(arg); break;
     case '?': printHelp(); break;
     default:
       Serial.print("Unknown command '");
       Serial.print(cmd);
       Serial.println("'. Type '?' for help.");
       break;
+  }
+}
+
+void handleCommand(char *line) {
+  while (*line == ' ' || *line == '\t') line++;  // skip leading blanks
+  if (*line == '\0') return;                       // blank line: ignore
+
+  if (pendingCmd) {
+    // A fresh command letter cancels the pending prompt.
+    if ((*line >= 'a' && *line <= 'z') || (*line >= 'A' && *line <= 'Z') ||
+        *line == '?') {
+      pendingCmd = 0;  // fall through, parse as a new command
+    } else {
+      char pc = pendingCmd;
+      pendingCmd = 0;
+      long arg = 0, arg2 = 0;
+      if (sscanf(line, "%ld %ld", &arg, &arg2) < 1) {
+        Serial.println("not a number — cancelled.");
+        return;
+      }
+      runCommand(pc, arg, arg2, true);
+      return;
+    }
+  }
+
+  char cmd = *line++;
+  long arg = 0, arg2 = 0;
+  int n = (cmd == 'e') ? sscanf(line, "%ld %ld", &arg, &arg2)
+                       : sscanf(line, "%ld", &arg);
+  runCommand(cmd, arg, arg2, n >= 1);
+}
+
+void loop() {
+  static char line[64];
+  static uint8_t len = 0;
+  while (Serial.available()) {
+    char c = (char)Serial.read();
+    if (c == '\r') continue;
+    if (c == '\n') {
+      line[len] = '\0';
+      len = 0;
+      handleCommand(line);
+      return;
+    }
+    if (len < sizeof(line) - 1) line[len++] = c;  // drop overflow chars
   }
 }
